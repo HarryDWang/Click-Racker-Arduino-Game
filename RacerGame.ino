@@ -1,0 +1,136 @@
+#include <LiquidCrystal.h>                    //imports library of functions to work with the LCD
+LiquidCrystal lcd(12, 11, 5, 4, 3, 2);        //creates LCD object in program, and declares the connected pins as parameters
+
+/*CONSTANT VALUES [CHANGE AS NEEDED]*/
+
+const int redLedPin = 10;                     //digital pins connected to the colored LEDs
+const int greenLedPin = 9;
+const int switch1Pin = 8;                     //digital pins connected to the push-button switches
+const int switch2Pin = 7;
+
+/*INTEGER VARIABLES*/
+
+int addScoreInc = 1;                          //increment values to add or subtract from score
+int subScoreInc = 3;
+int score1 = 0;                               //store player scores [initialized to 0]
+int score2 = 0;
+int loopNum = 0;                              //counter for number of loops passed through
+int timeScale = 1;                            //value to scale light durations [higher value makes lights stay on longer, making game easier]
+
+/*BOOLEAN VARIABLES*/
+
+boolean greenOn = true;                       //status of green and red LEDs [always opposite each other]
+boolean redOn = false;
+boolean startState1;                          //store the state of the switches at the start of each loop
+boolean startState2;
+boolean endState1;                            //store the state of the switches at the end of each loop
+boolean endState2;
+boolean difficultyChosen = false;             //stores whether or not user has finalized the difficulty
+boolean difficutyConfirmed = false;           
+
+/*LONG VARIABLES*/
+
+long randTime = 2000;                         //stores the randomly generated values that determine how long each light is on
+long startTime = 0;                           //holds the start time of each phase of lights being on/off
+
+
+void setup() {
+  Serial.begin(9600);                         //initializes feedback to the serial window
+
+  lcd.begin(16, 2);                           //starts output to LCD and gives screen size as parameter [16 wide by 2 tall]
+
+  pinMode(redLedPin, OUTPUT);                 //designates the redLedPin as an output
+  pinMode(greenLedPin, OUTPUT);               //designates the greenLedPin as an output
+  pinMode(switch1Pin, INPUT);                 //designates the switch1Pin as an input and allows the user to press switch
+  pinMode(switch2Pin, INPUT);                 //designates the switch2Pin as an input and allows the user to press switch
+
+  lcd.print("3 ");                            //LCD screen prints:"3 2 1 GO!"
+  delay(1000);
+  lcd.print("2 ");
+  delay(1000);
+  lcd.print("1 ");
+  delay(1000);
+  lcd.print("GO!");
+  delay(100);
+  lcd.clear();
+}
+
+void loop() {
+  while (score1 < 48 && score2 < 48) {             //while neither player has won
+    long elapsedTime = millis() - startTime;       //determines elapsed time by subtracting start time from current time
+
+    while (elapsedTime < randTime) {               //while the elapsed time for this lighting phase is less than the randomly assigned duration
+      if (score1 < 0)                              //prevents scores from being negative
+        score1 = 0;
+      if (score2 < 0)
+        score2 = 0;
+
+      loopNum++;                                   //increments loop number
+
+      if (loopNum % 6 == 0)                        //clears screen [allows updating the display] every third loop (REDUCES FLICKERING)
+        lcd.clear();
+
+      startState1 = digitalRead(switch1Pin) == HIGH;    //stores the state of the pushbuttons
+      startState2 = digitalRead(switch2Pin) == HIGH;
+
+      if (greenOn) {                               //if green light is assigned to on
+        analogWrite(greenLedPin, 255);             //lights up green and turns off red
+        analogWrite(redLedPin, 0);
+      }
+      else if (redOn) {                            //else if red light is assigned to on
+        analogWrite(greenLedPin, 0);               //lights up red and turns off green
+        analogWrite(redLedPin, 255);
+      }
+
+      if (startState1 && !endState1) {             //if condition checks for state change [button is pushed so it changes from off to on]
+                                                   //THIS WAY THE BUTTON CANNOT BE HELD DOWN
+        if (greenOn)                               //adds points if button clicked when green light is on
+          score1 += addScoreInc;
+        else if (redOn)                            //subtracts points if button clicked when red light is on
+          score1 -= subScoreInc;
+      }
+      if (startState2 && !endState2) {             //same code as above for player2
+        if (greenOn)
+          score2 += addScoreInc;
+        else if (redOn)
+          score2 -= subScoreInc;
+      }
+
+      elapsedTime = millis() - startTime;          //updates time passed since this lighting phase began
+      endState1 = digitalRead(switch1Pin) == HIGH; //assigns current state of switches
+      endState2 = digitalRead(switch2Pin) == HIGH;
+
+      Serial.println(score1);                      //outputs scores to serial monitor [for troubleshooting]
+      Serial.print(score2);
+
+      if (loopNum % 3 == 0) {                      //prints an additional "0" for each three points a player has
+        lcd.setCursor(0, 0);                       //prints in the top row
+        for (int i = 0; i < (score1 / 3); i++) {
+          lcd.print(">");
+        }
+        lcd.setCursor(0, 1);                       //prints in the 2nd row [for player2]
+        for (int j = 0; j < (score2 / 3); j++) {
+          lcd.print(">");
+        }
+      }
+    }
+
+
+    randTime = timeScale * 100 * random(0, 20);                //once a lighting duration passes, a new random value is generated and assigned to the random time duration variable
+    greenOn = !greenOn;                            //swaps greenOn and redOn so opposite color light lights up
+    redOn = !redOn;
+    startTime = millis();                          //assigns start time of new lighting phase
+
+
+
+  }
+
+  if (score1 >= 48) {                             //declares a player as the winner if his/her score reaches 48 points
+    lcd.clear();
+    lcd.print("1 wins!");
+  }
+  else {
+    lcd.clear();
+    lcd.print("2 wins!");
+  }
+}
